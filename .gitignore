@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------
+# Unity — pastas geradas. Nada aqui deve ir para o repositorio:
+# tudo e reconstruido pelo editor a partir de Assets/, Packages/
+# e ProjectSettings/.
+# ---------------------------------------------------------------
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Pacotes resolvidos localmente (o packages-lock.json E versionado)
+/[Aa]ssets/[Aa]ssetStoreTools*
+/[Aa]ssets/[Pp]lugins/[Ee]ditor/JetBrains*
+
+# ---------------------------------------------------------------
+# Arquivos de IDE e de solucao — gerados pelo Unity a cada abertura
+# ---------------------------------------------------------------
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# ---------------------------------------------------------------
+# Builds e artefatos
+# ---------------------------------------------------------------
+*.apk
+*.aab
+*.unitypackage
+*.app
+ExportedObj/
+crashlytics-build.properties
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# ---------------------------------------------------------------
+# Sistema operacional
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------
+# Resultados de teste do CI
+# ---------------------------------------------------------------
+/[Tt]est[Rr]esults/
+*.xml.meta
+artifacts/

@@ -1,0 +1,61 @@
+# ---------------------------------------------------------------
+# Fim de linha: normaliza no repositorio, cada um recebe o do seu SO.
+# ---------------------------------------------------------------
+* text=auto
+
+*.cs      text diff=csharp eol=lf
+*.asmdef  text eol=lf
+*.json    text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.md      text eol=lf
+*.shader  text eol=lf
+*.hlsl    text eol=lf
+*.cginc   text eol=lf
+
+# ---------------------------------------------------------------
+# Arquivos YAML do Unity (cenas, prefabs, materiais, assets).
+#
+# merge=unityyamlmerge faz o Git chamar a ferramenta do proprio Unity
+# no lugar do merge de texto. Cada pessoa precisa registrar a ferramenta
+# uma vez na maquina (o comando esta no README).
+#
+# Sem isso, dois commits na mesma cena geram um conflito praticamente
+# impossivel de resolver a mao.
+# ---------------------------------------------------------------
+*.unity           merge=unityyamlmerge eol=lf
+*.prefab          merge=unityyamlmerge eol=lf
+*.asset           merge=unityyamlmerge eol=lf
+*.mat             merge=unityyamlmerge eol=lf
+*.anim            merge=unityyamlmerge eol=lf
+*.controller      merge=unityyamlmerge eol=lf
+*.overrideController merge=unityyamlmerge eol=lf
+*.physicMaterial  merge=unityyamlmerge eol=lf
+*.physicsMaterial2D merge=unityyamlmerge eol=lf
+*.meta            merge=unityyamlmerge eol=lf
+*.inputactions    merge=unityyamlmerge eol=lf
+
+# ---------------------------------------------------------------
+# Git LFS — so binarios pesados. Textura e modelo nao dao merge de
+# qualquer jeito, e no LFS eles nao incham o historico.
+#
+# ATENCAO: o plano gratuito do GitHub da 1 GB de armazenamento e
+# 1 GB de banda por mes, e cada clone do CI consome banda. Mantenham
+# os assets leves.
+# ---------------------------------------------------------------
+*.png   filter=lfs diff=lfs merge=lfs -text
+*.jpg   filter=lfs diff=lfs merge=lfs -text
+*.jpeg  filter=lfs diff=lfs merge=lfs -text
+*.tga   filter=lfs diff=lfs merge=lfs -text
+*.psd   filter=lfs diff=lfs merge=lfs -text
+*.exr   filter=lfs diff=lfs merge=lfs -text
+*.hdr   filter=lfs diff=lfs merge=lfs -text
+*.fbx   filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+*.obj   filter=lfs diff=lfs merge=lfs -text
+*.wav   filter=lfs diff=lfs merge=lfs -text
+*.mp3   filter=lfs diff=lfs merge=lfs -text
+*.ogg   filter=lfs diff=lfs merge=lfs -text
+*.mp4   filter=lfs diff=lfs merge=lfs -text
+*.ttf   filter=lfs diff=lfs merge=lfs -text
+*.otf   filter=lfs diff=lfs merge=lfs -text
