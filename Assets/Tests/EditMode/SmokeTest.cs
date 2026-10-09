@@ -28,20 +28,39 @@ namespace RemoteChase.Tests
         [Test]
         public void CenaDaCorridaAbreComDroneECamera()
         {
-            var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
-                RailScenePath, UnityEditor.SceneManagement.OpenSceneMode.Single);
+            // Aditivo, nao Single: assim rodar o teste no Editor nao fecha a cena
+            // em que a pessoa esta trabalhando.
+            UnityEngine.SceneManagement.Scene scene =
+                UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
+                    RailScenePath, UnityEditor.SceneManagement.OpenSceneMode.Additive);
 
-            Assert.IsTrue(scene.IsValid(), "A cena da corrida nao abriu.");
+            try
+            {
+                Assert.IsTrue(scene.IsValid(), "A cena da corrida nao abriu.");
 
-            GameObject[] roots = scene.GetRootGameObjects();
+                GameObject[] roots = scene.GetRootGameObjects();
 
-            Assert.IsNotNull(roots.Select(r => r.GetComponentInChildren<DroneRailController>())
-                                  .FirstOrDefault(c => c != null),
-                             "A cena nao tem nenhum DroneRailController.");
+                Assert.IsNotNull(roots.Select(r => r.GetComponentInChildren<DroneRailController>())
+                                      .FirstOrDefault(c => c != null),
+                                 "A cena nao tem nenhum DroneRailController.");
 
-            Assert.IsNotNull(roots.Select(r => r.GetComponentInChildren<Camera>())
-                                  .FirstOrDefault(c => c != null),
-                             "A cena nao tem camera.");
+                Assert.IsNotNull(roots.Select(r => r.GetComponentInChildren<Camera>())
+                                      .FirstOrDefault(c => c != null),
+                                 "A cena nao tem camera.");
+
+                Assert.IsNotNull(roots.Select(r => r.GetComponentInChildren<Game.GameSession>())
+                                      .FirstOrDefault(c => c != null),
+                                 "A cena nao tem GameSession: sem ela nao ha vitoria, "
+                               + "derrota nem pontuacao.");
+
+                Assert.IsNotNull(roots.Select(r => r.GetComponentInChildren<Combat.PlayerHealth>())
+                                      .FirstOrDefault(c => c != null),
+                                 "O drone nao tem PlayerHealth.");
+            }
+            finally
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.CloseScene(scene, true);
+            }
         }
 
         [Test]

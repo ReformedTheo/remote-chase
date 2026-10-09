@@ -1,14 +1,15 @@
 using RemoteChase.Combat;
 using RemoteChase.Drone;
+using RemoteChase.Game;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace RemoteChase.UI
 {
     /// <summary>
-    /// HUD minimo em OnGUI: velocidade, altitude, distancia e ultima batida.
-    /// Feito em OnGUI de proposito -- nao exige Canvas nem nada montado a mao.
-    /// Serve tanto para o voo livre quanto para o trilho.
+    /// HUD do jogo em OnGUI: integridade, pontuacao, velocidade, progresso da fase
+    /// e o retículo da mira. Em OnGUI de proposito -- nao exige Canvas montado a
+    /// mao, entao a cena inteira continua sendo gerada por codigo.
     /// </summary>
     [AddComponentMenu("Remote Chase/Drone HUD")]
     public class DroneHud : MonoBehaviour
@@ -19,12 +20,18 @@ namespace RemoteChase.UI
         [Tooltip("Desenha o retículo da mira.")]
         public bool showReticle = true;
 
+        [Tooltip("Mostra o que o ultimo tiro encontrou. So para depuracao.")]
+        public bool showLastHit;
+
         IDroneMotion _motion;
         DroneRailController _rail;
         DroneAim _aim;
         DroneWeapon _weapon;
-        float _lastCrashSpeed;
+        PlayerHealth _health;
+        GameSession _session;
+
         float _lastCrashTime = -99f;
+        float _lastHealTime = -99f;
         GUIStyle _style;
         Texture2D _pixel;
 
@@ -37,6 +44,20 @@ namespace RemoteChase.UI
             _rail = _motion as DroneRailController;
             _aim = GetComponent<DroneAim>();
             _weapon = GetComponent<DroneWeapon>();
+            _health = GetComponent<PlayerHealth>();
+            _session = FindAnyObjectByType<GameSession>();
+        }
+
+        void OnEnable()
+        {
+            if (_motion != null) _motion.OnCrash += HandleCrash;
+            if (_health != null) _health.OnHealed += HandleHeal;
+        }
+
+        void OnDisable()
+        {
+            if (_motion != null) _motion.OnCrash -= HandleCrash;
+            if (_health != null) _health.OnHealed -= HandleHeal;
         }
 
         void OnDestroy()
@@ -44,18 +65,12 @@ namespace RemoteChase.UI
             if (_pixel != null) Destroy(_pixel);
         }
 
-        void OnEnable()
-        {
-            if (_motion != null) _motion.OnCrash += HandleCrash;
-        }
-
-        void OnDisable()
-        {
-            if (_motion != null) _motion.OnCrash -= HandleCrash;
-        }
-
         void Update()
         {
+            // Reiniciar posicao so faz sentido com a partida em andamento; depois
+            // do fim quem cuida do recomeco e a GameSession.
+            if (_session != null && _session.IsOver) return;
+
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && keyboard.rKey.wasPressedThisFrame && _motion != null)
             {
@@ -63,50 +78,107 @@ namespace RemoteChase.UI
             }
         }
 
-        void HandleCrash(float impactSpeed)
-        {
-            _lastCrashSpeed = impactSpeed;
-            _lastCrashTime = Time.time;
-        }
+        void HandleCrash(float impactSpeed) => _lastCrashTime = Time.time;
+
+        void HandleHeal(float amount) => _lastHealTime = Time.time;
 
         void OnGUI()
         {
             if (_motion == null) return;
+            if (_session != null && _session.IsOver) return;
 
+            EnsureStyle();
+            DrawReticle();
+            DrawStatus();
+            DrawControls();
+        }
+
+        void EnsureStyle()
+        {
             _style ??= new GUIStyle(GUI.skin.label)
             {
                 fontSize = 16,
                 normal = { textColor = Color.white }
             };
 
-            DrawReticle();
+            if (_pixel != null) return;
 
-            GUILayout.BeginArea(new Rect(16f, 16f, 280f, 220f));
+            _pixel = new Texture2D(1, 1);
+            _pixel.SetPixel(0, 0, Color.white);
+            _pixel.Apply();
+        }
+
+        void DrawStatus()
+        {
+            if (_health != null) DrawHealthBar();
+
+            GUILayout.BeginArea(new Rect(16f, _health != null ? 52f : 16f, 320f, 240f));
+
+            if (_session != null)
+            {
+                GUILayout.Label($"Pontos: {_session.Score}", _style);
+                GUILayout.Label($"Percurso: {_session.Progress * 100f:0}%"
+                              + $"  ({_session.Distance:0} / {_session.targetDistance:0} m)", _style);
+                GUILayout.Label($"Abatidos: {_session.Kills}", _style);
+            }
 
             GUILayout.Label($"Velocidade: {_motion.Speed * 3.6f:0} km/h", _style);
-            GUILayout.Label($"Altitude: {_motion.Altitude:0.0} m", _style);
 
             if (_rail != null)
             {
-                GUILayout.Label($"Distancia: {_rail.Distance:0} m", _style);
                 GUILayout.Label($"Aceleracao da fase: {_rail.SpeedProgress * 100f:0}%", _style);
             }
 
-            if (_motion.IsBoosting) GUILayout.Label("TURBO", _style);
-
-            if (Time.time - _lastCrashTime < 1.5f)
+            if (showLastHit && _weapon != null)
             {
-                GUILayout.Label($"Batida! -{_lastCrashSpeed:0} m/s", _style);
+                GUILayout.Label($"Ultimo tiro: {_weapon.LastHit}", _style);
             }
 
-            GUILayout.EndArea();
+            if (_rail != null)
+            {
+                GUILayout.Label(_rail.DashReady
+                    ? "Dash: pronto (Shift + direcao)"
+                    : $"Dash: recarregando {(1f - _rail.DashCharge) * 100f:0}%", _style);
+            }
 
+            if (_health != null && _health.InvulnerabilityLeft > 0.5f)
+            {
+                GUILayout.Label($"ESCUDO {_health.InvulnerabilityLeft:0.0}s", _style);
+            }
+
+            if (Time.time - _lastCrashTime < 1.2f) GUILayout.Label("BATIDA", _style);
+            if (Time.time - _lastHealTime < 1.2f) GUILayout.Label("REPARADO", _style);
+
+            GUILayout.EndArea();
+        }
+
+        void DrawHealthBar()
+        {
+            const float width = 260f;
+            const float height = 18f;
+            var back = new Rect(16f, 16f, width, height);
+
+            Color previous = GUI.color;
+
+            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.DrawTexture(back, _pixel);
+
+            // Verde cheio -> vermelho quase zerado: da para ler sem numero nenhum.
+            float fill = _health.Normalized;
+            GUI.color = Color.Lerp(new Color(1f, 0.3f, 0.25f), new Color(0.4f, 1f, 0.5f), fill);
+            GUI.DrawTexture(new Rect(back.x, back.y, width * fill, height), _pixel);
+
+            GUI.color = previous;
+            GUI.Label(new Rect(back.x + 8f, back.y - 1f, width, height),
+                      $"Integridade {_health.Current:0}", _style);
+        }
+
+        void DrawControls()
+        {
             if (!showControls) return;
 
-            GUILayout.BeginArea(new Rect(16f, Screen.height - 110f, 420f, 100f));
-            GUILayout.Label(_rail != null
-                ? "WASD mover   Mouse mirar   Clique atirar   R reiniciar"
-                : "WASD mover   Q/E girar   Espaco/Ctrl subir e descer   R reiniciar", _style);
+            GUILayout.BeginArea(new Rect(16f, Screen.height - 86f, 460f, 80f));
+            GUILayout.Label("WASD mover   Mouse mirar   Clique atirar   R reiniciar posicao", _style);
             if (_weapon != null) GUILayout.Label("Pare de manobrar para o tiro sair reto.", _style);
             GUILayout.EndArea();
         }
@@ -118,13 +190,6 @@ namespace RemoteChase.UI
         void DrawReticle()
         {
             if (!showReticle || _aim == null) return;
-
-            if (_pixel == null)
-            {
-                _pixel = new Texture2D(1, 1);
-                _pixel.SetPixel(0, 0, Color.white);
-                _pixel.Apply();
-            }
 
             float instability = _weapon != null ? _weapon.Instability : 0f;
 
@@ -138,7 +203,6 @@ namespace RemoteChase.UI
             Color previous = GUI.color;
             GUI.color = Color.Lerp(new Color(0.4f, 1f, 0.5f), new Color(1f, 0.35f, 0.3f), instability);
 
-            // Braços: esquerda, direita, cima, baixo.
             GUI.DrawTexture(new Rect(center.x - gap - arm, center.y - thickness * 0.5f, arm, thickness), _pixel);
             GUI.DrawTexture(new Rect(center.x + gap, center.y - thickness * 0.5f, arm, thickness), _pixel);
             GUI.DrawTexture(new Rect(center.x - thickness * 0.5f, center.y - gap - arm, thickness, arm), _pixel);

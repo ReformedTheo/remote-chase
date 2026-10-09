@@ -63,3 +63,15 @@ desktop.ini
 /[Tt]est[Rr]esults/
 *.xml.meta
 artifacts/
+
+# ---------------------------------------------------------------
+# Pasta de recuperacao do Unity: copias de cena geradas apos crash.
+# Sao locais e descartaveis; versionar isso polui o repo e confunde
+# quem clona (parece uma cena de verdade).
+# ---------------------------------------------------------------
+/[Aa]ssets/_[Rr]ecovery/
+/[Aa]ssets/_[Rr]ecovery.meta
+
+# Pasta Resources criada vazia pelo editor: o Git nao versiona pasta
+# vazia, entao o .meta sozinho viraria aviso de "meta sem asset".
+/[Aa]ssets/[Rr]esources.meta

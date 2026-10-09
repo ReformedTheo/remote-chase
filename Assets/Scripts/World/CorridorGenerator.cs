@@ -45,9 +45,51 @@ namespace RemoteChase.World
         [Tooltip("Chance de um segmento ter um bloco atravessado no meio do corredor.")]
         [Range(0f, 1f)] public float obstacleChance = 0.25f;
 
+        // Os inimigos sairam daqui: eles agora vivem no EnemySpawner, que viaja
+        // junto com o drone para os alvos ficarem parados na tela (estilo Aim Lab).
+        // O corredor cuida so do cenario e dos coletaveis em pista.
+
+        [Header("Coletaveis")]
+        [Tooltip("Centro da area onde os itens aparecem (X, altura).")]
+        public Vector2 pickupAreaCenter = new Vector2(0f, 14f);
+
+        [Tooltip("Meia largura e meia altura da area de itens.")]
+        public Vector2 pickupAreaHalfExtents = new Vector2(11f, 6f);
+
+        [Tooltip("Quantos itens no maximo por segmento.")]
+        public int pickupsPerSegment = 1;
+
+        [Tooltip("Chance de a vaga de item ser preenchida. Baixa de proposito: "
+               + "cura tem que ser algo que voce procura, nao algo que cai no colo.")]
+        [Range(0f, 1f)] public float pickupChance = 0.22f;
+
+        [Tooltip("Tamanho do item coletavel.")]
+        public float pickupSize = 1.8f;
+
+        [Tooltip("Dos itens que nascem, quantos sao celula de escudo em vez de reparo.")]
+        [Range(0f, 1f)] public float shieldShare = 0.35f;
+
+        [Header("Arte (opcional)")]
+        [Tooltip("Prefab do predio. Vazio = cubo primitivo. O prefab precisa ter "
+               + "tamanho base 1x1x1, porque o gerador dimensiona por localScale.")]
+        public GameObject buildingPrefab;
+
+        [Tooltip("Prefab do item de reparo. Vazio = capsula primitiva.")]
+        public GameObject repairPrefab;
+
+        [Tooltip("Prefab do item de escudo. Vazio = capsula primitiva.")]
+        public GameObject shieldPrefab;
+
         [Header("Visual")]
         public Material groundMaterial;
         public Material[] buildingMaterials;
+        public Material pickupMaterial;
+
+        [Tooltip("Material da celula de escudo.")]
+        public Material shieldMaterial;
+
+        Game.GameSession _session;
+        Combat.PlayerHealth _playerHealth;
 
         [Tooltip("Semente do sorteio: a mesma semente gera sempre a mesma fase.")]
         public int seed = 1337;
@@ -63,6 +105,7 @@ namespace RemoteChase.World
             public Transform Ground;
             public Transform[] Buildings;
             public Transform Obstacle;
+            public Combat.Pickup[] Pickups;
             public int Index = -1;
         }
 
@@ -73,6 +116,9 @@ namespace RemoteChase.World
                 var drone = FindAnyObjectByType<Drone.DroneRailController>();
                 if (drone != null) follow = drone.transform;
             }
+
+            _session = FindAnyObjectByType<Game.GameSession>();
+            _playerHealth = FindAnyObjectByType<Combat.PlayerHealth>();
 
             for (int i = 0; i < segmentsAhead + segmentsBehind + 1; i++)
             {
@@ -109,7 +155,8 @@ namespace RemoteChase.World
                 Root = root,
                 Ground = CreateBlock(root, "Chao", groundMaterial),
                 Buildings = new Transform[buildingsPerSide * 2],
-                Obstacle = CreateBlock(root, "Obstaculo", PickMaterial(0))
+                Obstacle = CreateBlock(root, "Obstaculo", PickMaterial(0)),
+                Pickups = new Combat.Pickup[Mathf.Max(pickupsPerSegment, 0)]
             };
 
             for (int i = 0; i < segment.Buildings.Length; i++)
@@ -117,21 +164,73 @@ namespace RemoteChase.World
                 segment.Buildings[i] = CreateBlock(root, $"Predio_{i}", PickMaterial(i));
             }
 
+            for (int i = 0; i < segment.Pickups.Length; i++)
+            {
+                segment.Pickups[i] = CreatePickup(root, i);
+            }
+
             return segment;
+        }
+
+        Combat.Pickup CreatePickup(Transform parent, int index)
+        {
+            // Os tipos sao distribuidos na criacao e nao mudam depois: assim cada
+            // item mantem o prefab e o material do seu tipo ao ser reciclado.
+            bool isShield = index % 3 == 0 && shieldShare > 0f;
+            GameObject prefab = isShield ? shieldPrefab : repairPrefab;
+            Material material = isShield ? shieldMaterial : pickupMaterial;
+
+            GameObject body = CreateVisual(parent, isShield ? $"Escudo_{index}" : $"Reparo_{index}",
+                                           prefab, PrimitiveType.Capsule, material);
+            body.transform.localScale = Vector3.one * pickupSize;
+
+            // Sem collider: se tivesse, encostar no item dispararia o
+            // OnTriggerEnter do drone e contaria como batida. A coleta e por distancia.
+            foreach (Collider collider in body.GetComponentsInChildren<Collider>())
+            {
+                Destroy(collider);
+            }
+
+            var pickup = body.AddComponent<Combat.Pickup>();
+            pickup.kind = isShield ? Combat.PickupKind.Escudo : Combat.PickupKind.Reparo;
+            pickup.Player = _playerHealth;
+            pickup.OnCollected += HandlePickupCollected;
+            body.SetActive(false);
+            return pickup;
+        }
+
+        /// <summary>
+        /// Cria um objeto de cena a partir do prefab de arte, ou da primitiva
+        /// correspondente quando ainda nao ha prefab. E o ponto unico onde a
+        /// troca "bloco cinza -> modelo da Ramune" acontece.
+        /// </summary>
+        GameObject CreateVisual(Transform parent, string name, GameObject prefab,
+                                PrimitiveType fallback, Material material)
+        {
+            GameObject body = prefab != null
+                ? Instantiate(prefab, parent)
+                : GameObject.CreatePrimitive(fallback);
+
+            body.name = name;
+            if (prefab == null) body.transform.SetParent(parent, false);
+
+            // Com prefab, o material e o do proprio modelo: nao sobrescreve a arte.
+            if (prefab == null && material != null)
+            {
+                body.GetComponent<MeshRenderer>().sharedMaterial = material;
+            }
+
+            return body;
+        }
+
+        void HandlePickupCollected(Combat.Pickup pickup)
+        {
+            if (_session != null) _session.RegisterPickup();
         }
 
         Transform CreateBlock(Transform parent, string name, Material material)
         {
-            var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            block.name = name;
-            block.transform.SetParent(parent, false);
-
-            if (material != null)
-            {
-                block.GetComponent<MeshRenderer>().sharedMaterial = material;
-            }
-
-            return block.transform;
+            return CreateVisual(parent, name, buildingPrefab, PrimitiveType.Cube, material).transform;
         }
 
         Material PickMaterial(int index)
@@ -172,6 +271,32 @@ namespace RemoteChase.World
             }
 
             PlaceObstacle(segment, random);
+            PlacePickups(segment, random);
+        }
+
+        void PlacePickups(Segment segment, System.Random random)
+        {
+            if (segment.Pickups == null) return;
+
+            for (int i = 0; i < segment.Pickups.Length; i++)
+            {
+                Combat.Pickup pickup = segment.Pickups[i];
+                if (pickup == null) continue;
+
+                if (random.NextDouble() >= pickupChance)
+                {
+                    pickup.gameObject.SetActive(false);
+                    continue;
+                }
+
+                float x = pickupAreaCenter.x
+                        + ((float)random.NextDouble() * 2f - 1f) * pickupAreaHalfExtents.x;
+                float y = pickupAreaCenter.y
+                        + ((float)random.NextDouble() * 2f - 1f) * pickupAreaHalfExtents.y;
+                float z = (float)random.NextDouble() * segmentLength;
+
+                pickup.Spawn(new Vector3(x, y, z), (float)random.NextDouble() * 6.28f);
+            }
         }
 
         void PlaceObstacle(Segment segment, System.Random random)

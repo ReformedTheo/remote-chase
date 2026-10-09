@@ -1,0 +1,14 @@
+<!--
+  Preserva o modulo de fisica do corte de codigo (managed stripping) do IL2CPP.
+
+  O corredor cria inimigos e coletaveis em runtime com GameObject.CreatePrimitive,
+  que anexa SphereCollider e CapsuleCollider pelo lado nativo da engine. O linker
+  nao enxerga essa referencia, entao removia as duas classes do build, e no jogo
+  os inimigos apareciam sem collider, impossiveis de acertar.
+
+  O sintoma so aparece no build (WebGL/IL2CPP), nunca no editor:
+  "Can't add component because class 'SphereCollider' doesn't exist!"
+-->
+<linker>
+  <assembly fullname="UnityEngine.PhysicsModule" preserve="all" />
+</linker>

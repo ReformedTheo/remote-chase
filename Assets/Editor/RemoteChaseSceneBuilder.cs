@@ -2,6 +2,7 @@ using System.IO;
 using RemoteChase.CameraRig;
 using RemoteChase.Combat;
 using RemoteChase.Drone;
+using RemoteChase.Game;
 using RemoteChase.UI;
 using RemoteChase.World;
 using UnityEditor;
@@ -67,14 +68,19 @@ namespace RemoteChase.EditorTools
         [MenuItem("Tools/Remote Chase/Criar cena Corrida (rail)")]
         public static void CreateRailScene()
         {
-            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
-
-            if (File.Exists(RailScenePath)
-                && !EditorUtility.DisplayDialog("Remote Chase",
-                        $"{RailScenePath} ja existe e sera sobrescrito. Continuar?",
-                        "Sobrescrever", "Cancelar"))
+            // Em batchmode nao existe ninguem para responder dialogo: o build pela
+            // linha de comando chama este mesmo metodo e travaria aqui.
+            if (!Application.isBatchMode)
             {
-                return;
+                if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+
+                if (File.Exists(RailScenePath)
+                    && !EditorUtility.DisplayDialog("Remote Chase",
+                            $"{RailScenePath} ja existe e sera sobrescrito. Continuar?",
+                            "Sobrescrever", "Cancelar"))
+                {
+                    return;
+                }
             }
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -92,11 +98,33 @@ namespace RemoteChase.EditorTools
 
             GameObject drone = CreateRailDrone(droneMaterial);
 
+            // Regras da fase antes do corredor: o gerador procura a sessao no Start
+            // para registrar abates e coletas.
+            var sessionRoot = new GameObject("Regras da fase");
+            sessionRoot.AddComponent<GameSession>();
+
+            var bulletPoolRoot = new GameObject("Tiros inimigos");
+            var bulletPool = bulletPoolRoot.AddComponent<EnemyBulletPool>();
+            bulletPool.bulletMaterial = GetOrCreateMaterial(
+                "TiroInimigo", new Color(1f, 0.25f, 0.6f), 0.4f);
+
             var corridorRoot = new GameObject("Corredor");
             var corridor = corridorRoot.AddComponent<CorridorGenerator>();
             corridor.follow = drone.transform;
             corridor.groundMaterial = ground;
             corridor.buildingMaterials = buildings;
+            corridor.pickupMaterial = GetOrCreateMaterial(
+                "Reparo", new Color(0.25f, 0.95f, 0.55f), 0.7f);
+            corridor.shieldMaterial = GetOrCreateMaterial(
+                "Escudo", new Color(0.3f, 0.7f, 1f), 0.8f);
+
+            // Campo de alvos separado do cenario: ele viaja junto com o drone,
+            // entao os inimigos ficam parados na tela (Drone Sentinela do GDR).
+            var spawnerRoot = new GameObject("Alvos");
+            var spawner = spawnerRoot.AddComponent<EnemySpawner>();
+            spawner.drone = drone.GetComponent<DroneRailController>();
+            spawner.enemyMaterial = GetOrCreateMaterial(
+                "Inimigo", new Color(0.95f, 0.25f, 0.1f), 0.6f);
 
             CreateRailCamera(drone.transform);
 
@@ -139,10 +167,11 @@ namespace RemoteChase.EditorTools
             // No trilho o avanco e constante, entao o nariz responde a subida.
             droneVisual.pitchSource = DroneVisual.PitchSource.ClimbRate;
 
+            drone.AddComponent<PlayerHealth>();
             drone.AddComponent<DroneAim>();
 
             var weapon = drone.AddComponent<DroneWeapon>();
-            weapon.projectileMaterial = GetOrCreateMaterial(
+            weapon.tracerMaterial = GetOrCreateMaterial(
                 "Tiro", new Color(1f, 0.85f, 0.2f), 0.5f);
 
             drone.AddComponent<DroneHud>();

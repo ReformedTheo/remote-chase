@@ -5,10 +5,13 @@ using UnityEngine;
 namespace RemoteChase.Combat
 {
     /// <summary>
-    /// Canhao do drone. O tiro so sai reto na mira quando o drone esta parado:
-    /// manobrando, o projetil herda a velocidade lateral do drone e passa longe
-    /// do retículo. Quem quer acertar precisa soltar o comando de movimento --
-    /// e ficar parado no meio dos obstaculos e o risco que paga a precisao.
+    /// Canhao hitscan, no modelo de CS/Valorant: o tiro e resolvido na hora por
+    /// raycast -- sem tempo de voo, sem queda, sem antecipar o alvo. Se o retículo
+    /// esta em cima e o drone esta parado, acerta.
+    ///
+    /// A imprecisao e angular e vem da manobra: quanto mais o drone se move, mais
+    /// o tiro sai puxado para o lado do movimento. Parar de manobrar zera o desvio,
+    /// mas deixa voce parado no meio dos obstaculos -- e essa a troca.
     /// </summary>
     [AddComponentMenu("Remote Chase/Drone Weapon")]
     public class DroneWeapon : MonoBehaviour
@@ -17,8 +20,8 @@ namespace RemoteChase.Combat
         [Tooltip("Tiros por segundo.")]
         public float fireRate = 6f;
 
-        [Tooltip("Velocidade do projetil em m/s, somada a do drone.")]
-        public float projectileSpeed = 260f;
+        [Tooltip("Alcance maximo do tiro em metros.")]
+        public float range = 400f;
 
         [Tooltip("Dano por tiro.")]
         public float damage = 1f;
@@ -26,37 +29,42 @@ namespace RemoteChase.Combat
         [Tooltip("De onde o tiro sai, em coordenadas locais do drone.")]
         public Vector3 muzzleOffset = new Vector3(0f, 0f, 1.2f);
 
-        [Header("Precisao")]
-        [Tooltip("Quanto da velocidade de manobra o projetil herda. "
-               + "1 = desvio total ao se mover, 0 = sempre acerta a mira.")]
-        [Range(0f, 2f)] public float maneuverDrift = 1f;
+        [Tooltip("Camadas em que o tiro bate.")]
+        public LayerMask hitLayers = ~0;
 
-        [Tooltip("Velocidade de manobra (m/s) a partir da qual a mira ja e considerada "
-               + "totalmente instavel. Serve so para o retorno visual do retículo.")]
+        [Header("Precisao")]
+        [Tooltip("Desvio maximo em graus, com o drone manobrando no limite. "
+               + "0 faz o tiro sempre sair no retículo.")]
+        public float maxDeviationAngle = 7f;
+
+        [Tooltip("Velocidade de manobra (m/s) que ja conta como desvio maximo.")]
         public float instabilityReference = 12f;
 
-        [Header("Projetil")]
-        [Tooltip("Tamanho do projetil.")]
-        public float projectileSize = 0.35f;
+        [Header("Visual do tiro")]
+        [Tooltip("Material do risco do tiro.")]
+        public Material tracerMaterial;
 
-        [Tooltip("Material do projetil.")]
-        public Material projectileMaterial;
-
-        [Tooltip("Quantos projeteis o pool cria de uma vez.")]
-        public int poolSize = 32;
+        [Tooltip("Quantos riscos o pool cria de uma vez.")]
+        public int poolSize = 16;
 
         /// <summary>
-        /// 0 = drone parado, tiro sai exatamente na mira. 1 = manobrando forte,
-        /// o tiro passa longe. O HUD usa isto para abrir o retículo.
+        /// 0 = drone parado, tiro sai exatamente no retículo. 1 = manobrando forte,
+        /// desvio maximo. O HUD usa isto para abrir o retículo.
         /// </summary>
         public float Instability { get; private set; }
 
-        /// <summary>Verdadeiro quando o tiro sai reto na mira.</summary>
+        /// <summary>Verdadeiro quando o tiro sai no ponto do retículo.</summary>
         public bool IsSteady => Instability < 0.05f;
+
+        /// <summary>
+        /// Nome do que o ultimo tiro encontrou, para o HUD. E so diagnostico:
+        /// mostra se o raio esta passando no alvo errado ou acertando sem dar dano.
+        /// </summary>
+        public string LastHit { get; private set; } = "-";
 
         DroneAim _aim;
         IDroneMotion _motion;
-        readonly Stack<Projectile> _pool = new Stack<Projectile>();
+        readonly Stack<Tracer> _pool = new Stack<Tracer>();
         Transform _poolRoot;
         float _cooldown;
 
@@ -65,8 +73,8 @@ namespace RemoteChase.Combat
             _aim = GetComponent<DroneAim>();
             _motion = GetComponent<IDroneMotion>();
 
-            _poolRoot = new GameObject("Projeteis").transform;
-            for (int i = 0; i < poolSize; i++) _pool.Push(CreateProjectile());
+            _poolRoot = new GameObject("Tiros").transform;
+            for (int i = 0; i < poolSize; i++) _pool.Push(CreateTracer());
         }
 
         void Update()
@@ -101,46 +109,90 @@ namespace RemoteChase.Combat
         void Fire()
         {
             Vector3 muzzle = transform.TransformPoint(muzzleOffset);
-            Vector3 aimPoint = _aim != null ? _aim.AimPoint : muzzle + transform.forward * 100f;
 
-            Vector3 direction = (aimPoint - muzzle).normalized;
-            Vector3 velocity = direction * projectileSpeed;
+            // O tiro segue o raio da camera, nao a linha do cano: e o unico jeito
+            // de acertar exatamente o que esta debaixo do retículo. A origem e
+            // empurrada ate a profundidade do drone para o raio nao bater em um
+            // predio que esteja entre a camera e o drone.
+            Ray aimRay = _aim != null
+                ? _aim.AimRay
+                : new Ray(muzzle, transform.forward);
 
-            // O desvio: o projetil sai com a velocidade lateral que o drone tinha.
-            // Parado, isso e zero e o tiro vai exatamente para o retículo.
-            if (_motion != null)
+            float toDrone = Vector3.Dot(transform.position - aimRay.origin, aimRay.direction);
+            Vector3 origin = aimRay.GetPoint(Mathf.Max(toDrone, 0f));
+            Vector3 direction = ApplyDeviation(aimRay.direction);
+
+            // Hitscan: o resultado do tiro e decidido aqui, neste frame.
+            Vector3 impact = origin + direction * range;
+
+            if (Physics.Raycast(origin, direction, out RaycastHit hit, range, hitLayers,
+                                QueryTriggerInteraction.Ignore))
             {
-                velocity += _motion.ManeuverVelocity * maneuverDrift;
+                impact = hit.point;
+                LastHit = hit.collider.name;
+
+                // GetComponentInParent, nao TryGetComponent: aquele nao e confiavel
+                // com interface, e este ainda cobre collider em objeto filho.
+                var target = hit.collider.GetComponentInParent<IHittable>();
+                if (target != null)
+                {
+                    target.TakeHit(damage, hit.point);
+                    LastHit += " (acertou)";
+                }
+            }
+            else
+            {
+                LastHit = "nada";
             }
 
-            Projectile projectile = _pool.Count > 0 ? _pool.Pop() : CreateProjectile();
-            projectile.damage = damage;
-            projectile.Launch(muzzle, velocity, Recycle);
+            ShowTracer(muzzle, impact);
         }
 
-        void Recycle(Projectile projectile)
+        /// <summary>
+        /// Gira a direcao do tiro em direcao ao movimento do drone.
+        /// Parado, devolve a direcao intacta e o tiro sai no retículo.
+        /// </summary>
+        Vector3 ApplyDeviation(Vector3 direction)
         {
-            _pool.Push(projectile);
+            if (_motion == null || maxDeviationAngle <= 0f) return direction;
+
+            Vector3 maneuver = _motion.ManeuverVelocity;
+            if (maneuver.sqrMagnitude < 0.0001f) return direction;
+
+            // O desvio e para o lado do movimento, nao aleatorio: assim o jogador
+            // consegue aprender a compensar em vez de so torcer.
+            float angle = maxDeviationAngle * Instability * Mathf.Deg2Rad;
+            return Vector3.RotateTowards(direction, maneuver.normalized, angle, 0f);
         }
 
-        Projectile CreateProjectile()
+        void ShowTracer(Vector3 from, Vector3 to)
+        {
+            Tracer tracer = _pool.Count > 0 ? _pool.Pop() : CreateTracer();
+            tracer.Show(from, to, Recycle);
+        }
+
+        void Recycle(Tracer tracer)
+        {
+            _pool.Push(tracer);
+        }
+
+        Tracer CreateTracer()
         {
             var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
             body.name = "Tiro";
             body.transform.SetParent(_poolRoot, false);
-            // O projetil e alongado no eixo do movimento: le melhor em alta velocidade.
-            body.transform.localScale = new Vector3(projectileSize, projectileSize, projectileSize * 5f);
 
+            // O risco e so visual: sem collider, para nao atrapalhar nenhum raycast.
             Object.Destroy(body.GetComponent<Collider>());
 
-            if (projectileMaterial != null)
+            if (tracerMaterial != null)
             {
-                body.GetComponent<MeshRenderer>().sharedMaterial = projectileMaterial;
+                body.GetComponent<MeshRenderer>().sharedMaterial = tracerMaterial;
             }
 
-            var projectile = body.AddComponent<Projectile>();
+            var tracer = body.AddComponent<Tracer>();
             body.SetActive(false);
-            return projectile;
+            return tracer;
         }
     }
 }

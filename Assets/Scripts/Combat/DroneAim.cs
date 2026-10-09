@@ -35,6 +35,14 @@ namespace RemoteChase.Combat
         /// <summary>Ponto do mundo para onde a mira aponta.</summary>
         public Vector3 AimPoint { get; private set; }
 
+        /// <summary>
+        /// Raio da camera que passa pelo retículo. E ESTE que o tiro deve usar:
+        /// o retículo e desenhado a partir da camera, entao so um raio que sai da
+        /// camera acerta o que esta visualmente debaixo dele. Um raio saindo do
+        /// cano do drone erra por paralaxe, porque a camera esta metros atras.
+        /// </summary>
+        public Ray AimRay { get; private set; }
+
         Camera _camera;
 
         void Awake()
@@ -62,8 +70,28 @@ namespace RemoteChase.Combat
             if (_camera == null) _camera = Camera.main;
             if (_camera == null) return;
 
+            KeepCursorLocked();
             MoveReticle();
+            AimRay = _camera.ScreenPointToRay(ScreenPosition);
             AimPoint = ProjectToWorld();
+        }
+
+        /// <summary>
+        /// Reativa a trava do cursor quando o jogador clica.
+        ///
+        /// No navegador o pointer lock so e concedido dentro de um gesto do
+        /// usuario: pedir a trava no OnEnable, durante o carregamento, falha sem
+        /// erro nenhum. Tambem cobre o caso de a pessoa apertar Esc e voltar.
+        /// </summary>
+        void KeepCursorLocked()
+        {
+            if (!lockCursor || Cursor.lockState == CursorLockMode.Locked) return;
+
+            Mouse mouse = Mouse.current;
+            if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
+
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
 
         void MoveReticle()

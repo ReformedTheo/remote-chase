@@ -23,6 +23,9 @@ namespace RemoteChase.Drone
         /// <summary>Gatilho de tiro segurado.</summary>
         public bool Fire;
 
+        /// <summary>Dash acionado neste frame (toque, nao segurar).</summary>
+        public bool Dash;
+
         public static readonly DroneInput None = default;
     }
 
@@ -52,6 +55,7 @@ namespace RemoteChase.Drone
             float rawLift = 0f;
             bool boost = false;
             bool fire = false;
+            bool dash = false;
 
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null)
@@ -68,6 +72,7 @@ namespace RemoteChase.Drone
                 if (keyboard.leftCtrlKey.isPressed || keyboard.cKey.isPressed) rawLift -= 1f;
 
                 boost |= keyboard.leftShiftKey.isPressed;
+                dash |= keyboard.leftShiftKey.wasPressedThisFrame;
             }
 
             Mouse mouse = Mouse.current;
@@ -89,6 +94,7 @@ namespace RemoteChase.Drone
                 rawLift += gamepad.rightTrigger.ReadValue() - gamepad.leftTrigger.ReadValue();
                 boost |= gamepad.buttonSouth.isPressed;
                 fire |= gamepad.rightShoulder.isPressed;
+                dash |= gamepad.leftShoulder.wasPressedThisFrame;
             }
 
             rawMove = Vector2.ClampMagnitude(rawMove, 1f);
@@ -108,7 +114,8 @@ namespace RemoteChase.Drone
                 Yaw = _yaw,
                 Lift = _lift,
                 Boost = boost,
-                Fire = fire
+                Fire = fire,
+                Dash = dash
             };
         }
 

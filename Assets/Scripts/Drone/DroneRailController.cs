@@ -50,6 +50,17 @@ namespace RemoteChase.Drone
         [Tooltip("Meia largura e meia altura da area jogavel, a partir do centro do trilho.")]
         public Vector2 boundsHalfExtents = new Vector2(12f, 8f);
 
+        [Header("Dash (Barrel Roll)")]
+        [Tooltip("Velocidade instantanea do dash em m/s.")]
+        public float dashSpeed = 34f;
+
+        [Tooltip("Segundos de espera entre dois dashes.")]
+        public float dashCooldown = 1.3f;
+
+        [Tooltip("Segundos de imunidade concedidos pelo dash. E o que torna o dash "
+               + "uma esquiva de verdade, e nao so um empurrao.")]
+        public float dashInvulnerability = 0.4f;
+
         [Header("Colisao")]
         [Tooltip("Fracao da velocidade perdida ao bater.")]
         [Range(0f, 1f)] public float crashSpeedPenalty = 0.45f;
@@ -62,6 +73,15 @@ namespace RemoteChase.Drone
 
         /// <inheritdoc/>
         public event Action<float> OnCrash;
+
+        /// <summary>Disparado ao executar um dash. Parametro = direcao no plano X/Y.</summary>
+        public event Action<Vector2> OnDash;
+
+        /// <summary>Dash disponivel agora.</summary>
+        public bool DashReady => _dashTimer <= 0f;
+
+        /// <summary>Recarga do dash, de 0 (pronto) a 1 (acabou de usar).</summary>
+        public float DashCharge => dashCooldown > 0f ? Mathf.Clamp01(_dashTimer / dashCooldown) : 0f;
 
         /// <summary>Distancia percorrida na fase, em metros.</summary>
         public float Distance { get; private set; }
@@ -109,6 +129,8 @@ namespace RemoteChase.Drone
         float _railX;         // centro do trilho em X (fixo por enquanto)
         float _startZ;
         float _crashTimer;
+        float _dashTimer;
+        Combat.PlayerHealth _health;
 
         void Awake()
         {
@@ -129,7 +151,32 @@ namespace RemoteChase.Drone
         void Update()
         {
             CurrentInput = inputReader.Read(Time.deltaTime);
+
             if (_crashTimer > 0f) _crashTimer -= Time.deltaTime;
+            if (_dashTimer > 0f) _dashTimer -= Time.deltaTime;
+
+            if (CurrentInput.Dash) TryDash();
+        }
+
+        /// <summary>
+        /// Arranco lateral com imunidade breve. Exige direcao: dash sem comando de
+        /// movimento nao faz nada, para nao virar um botao de apertar sem pensar.
+        /// </summary>
+        void TryDash()
+        {
+            if (!DashReady) return;
+
+            var direction = new Vector2(CurrentInput.Move.x, CurrentInput.Move.y + CurrentInput.Lift);
+            if (direction.sqrMagnitude < 0.04f) return;
+
+            direction.Normalize();
+            _maneuverVelocity = direction * dashSpeed;
+            _dashTimer = dashCooldown;
+
+            if (_health == null) _health = GetComponent<Combat.PlayerHealth>();
+            if (_health != null) _health.GrantInvulnerability(dashInvulnerability);
+
+            OnDash?.Invoke(direction);
         }
 
         void FixedUpdate()
@@ -157,7 +204,14 @@ namespace RemoteChase.Drone
 
             _maneuverVelocity += command * (maneuverAcceleration * dt);
             _maneuverVelocity -= _maneuverVelocity * (maneuverDrag * dt);
-            _maneuverVelocity = Vector2.ClampMagnitude(_maneuverVelocity, maxManeuverSpeed);
+
+            // O teto so corta a aceleracao normal. Um dash sai acima dele de
+            // proposito; quem traz de volta e o arrasto, o que da o deslize
+            // caracteristico no fim do arranco.
+            if (_maneuverVelocity.magnitude <= maxManeuverSpeed)
+            {
+                _maneuverVelocity = Vector2.ClampMagnitude(_maneuverVelocity, maxManeuverSpeed);
+            }
 
             _offset += _maneuverVelocity * dt;
 
@@ -199,6 +253,7 @@ namespace RemoteChase.Drone
             _offset = Vector2.zero;
             _maneuverVelocity = Vector2.zero;
             _crashTimer = 0f;
+            _dashTimer = 0f;
             inputReader.Reset();
             transform.position = new Vector3(_railX, railHeight, _startZ);
         }
