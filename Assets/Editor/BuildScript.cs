@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -42,7 +43,7 @@ namespace RemoteChase.EditorTools
 
             var options = new BuildPlayerOptions
             {
-                scenes = new[] { ScenePath },
+                scenes = EnabledScenes(),
                 locationPathName = output,
                 target = BuildTarget.StandaloneWindows64,
                 targetGroup = BuildTargetGroup.Standalone,
@@ -90,7 +91,7 @@ namespace RemoteChase.EditorTools
 
             var options = new BuildPlayerOptions
             {
-                scenes = new[] { ScenePath },
+                scenes = EnabledScenes(),
                 locationPathName = output,
                 target = BuildTarget.WebGL,
                 targetGroup = BuildTargetGroup.WebGL,
@@ -110,6 +111,19 @@ namespace RemoteChase.EditorTools
             }
 
             Fail($"Build falhou: {summary.result}, {summary.totalErrors} erro(s).");
+        }
+
+        /// <summary>
+        /// As cenas marcadas no Build Settings, na ordem. A primeira e a que abre
+        /// o jogo. Antes isto era a Corrida fixa no codigo, o que deixava o menu
+        /// de fora do build e quebrava o botao de voltar ao menu.
+        /// </summary>
+        static string[] EnabledScenes()
+        {
+            return EditorBuildSettings.scenes
+                .Where(s => s.enabled && File.Exists(s.path))
+                .Select(s => s.path)
+                .ToArray();
         }
 
         /// <summary>Le um argumento nomeado da linha de comando do Unity.</summary>
