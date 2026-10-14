@@ -27,7 +27,11 @@ public class PauseMenuController : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
+        // Portado do Input Manager antigo para o Input System novo: este projeto
+        // roda com activeInputHandler = 1 (so o novo), e Input.GetKeyDown lanca
+        // excecao nesse modo. Mesmo comportamento, API diferente.
+        var keyboard = UnityEngine.InputSystem.Keyboard.current;
+        if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
         {
             if (optionsPanel != null && optionsPanel.activeSelf)
             {

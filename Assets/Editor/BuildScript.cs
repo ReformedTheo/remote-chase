@@ -28,12 +28,12 @@ namespace RemoteChase.EditorTools
         {
             string output = ReadArgument("-outputPath") ?? DefaultOutput;
 
-            Log($"Regenerando {ScenePath}...");
-            RemoteChaseSceneBuilder.CreateRailScene();
-
+            // A cena NAO e regerada aqui: desde que a UI passou a ser montada a
+            // mao, regerar apagaria o trabalho feito no editor. O build usa a
+            // cena como ela esta versionada.
             if (!File.Exists(ScenePath))
             {
-                Fail($"A cena {ScenePath} nao foi gerada. Abortando.");
+                Fail($"A cena {ScenePath} nao existe. Abortando.");
                 return;
             }
 
@@ -69,12 +69,12 @@ namespace RemoteChase.EditorTools
         {
             string output = ReadArgument("-outputPath") ?? "Builds/WebGL";
 
-            Log($"Regenerando {ScenePath}...");
-            RemoteChaseSceneBuilder.CreateRailScene();
-
+            // A cena NAO e regerada aqui: desde que a UI passou a ser montada a
+            // mao, regerar apagaria o trabalho feito no editor. O build usa a
+            // cena como ela esta versionada.
             if (!File.Exists(ScenePath))
             {
-                Fail($"A cena {ScenePath} nao foi gerada. Abortando.");
+                Fail($"A cena {ScenePath} nao existe. Abortando.");
                 return;
             }
 

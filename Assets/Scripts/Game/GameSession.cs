@@ -54,7 +54,9 @@ namespace RemoteChase.Game
 
         DroneRailController _drone;
         PlayerHealth _health;
+        DroneEnergy _energy;
         int _bonusScore;
+        string _defeatReason = "Blindagem destruida";
         GUIStyle _title;
         GUIStyle _line;
 
@@ -62,6 +64,7 @@ namespace RemoteChase.Game
         {
             _drone = FindAnyObjectByType<DroneRailController>();
             _health = FindAnyObjectByType<PlayerHealth>();
+            _energy = FindAnyObjectByType<DroneEnergy>();
 
             // Time.timeScale e global e sobrevive a troca de cena: se a partida
             // anterior terminou com o jogo pausado, e aqui que ele volta a andar.
@@ -71,11 +74,13 @@ namespace RemoteChase.Game
         void OnEnable()
         {
             if (_health != null) _health.OnDied += HandleDeath;
+            if (_energy != null) _energy.OnDepleted += HandleEnergyOut;
         }
 
         void OnDisable()
         {
             if (_health != null) _health.OnDied -= HandleDeath;
+            if (_energy != null) _energy.OnDepleted -= HandleEnergyOut;
         }
 
         void Update()
@@ -108,6 +113,13 @@ namespace RemoteChase.Game
 
         void HandleDeath()
         {
+            _defeatReason = "Blindagem destruida";
+            Finish(false);
+        }
+
+        void HandleEnergyOut()
+        {
+            _defeatReason = "Bateria esgotada";
             Finish(false);
         }
 
@@ -169,7 +181,10 @@ namespace RemoteChase.Game
             _title.normal.textColor = Won ? new Color(0.5f, 1f, 0.6f) : new Color(1f, 0.45f, 0.4f);
             GUILayout.Label(Won ? "VITORIA" : "DERROTA", _title);
 
-            GUILayout.Space(16f);
+            GUILayout.Space(8f);
+            if (!Won) GUILayout.Label(_defeatReason, _line);
+
+            GUILayout.Space(8f);
             GUILayout.Label($"Pontuacao: {Score}", _line);
             GUILayout.Label($"Distancia: {Distance:0} m de {targetDistance:0} m", _line);
             GUILayout.Label($"Inimigos abatidos: {Kills}", _line);

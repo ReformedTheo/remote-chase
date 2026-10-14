@@ -40,6 +40,16 @@ namespace RemoteChase.Combat
         [Tooltip("Velocidade de manobra (m/s) que ja conta como desvio maximo.")]
         public float instabilityReference = 12f;
 
+        [Header("Áudio (SFX)")]
+        // Trazido do DroneWeapon do Rafael. La o disparo era projetil; aqui e
+        // hitscan, entao so o trecho de audio veio -- o resto do arquivo dele
+        // reverteria a correcao de paralaxe da mira.
+        [Tooltip("Arquivo de som do tiro (ex: tiro1).")]
+        public AudioClip shootSound;
+
+        [Tooltip("Audio Source responsável por tocar o som do tiro.")]
+        public AudioSource audioSource;
+
         [Header("Visual do tiro")]
         [Tooltip("Material do risco do tiro.")]
         public Material tracerMaterial;
@@ -72,6 +82,9 @@ namespace RemoteChase.Combat
         {
             _aim = GetComponent<DroneAim>();
             _motion = GetComponent<IDroneMotion>();
+
+            // Se o AudioSource não foi arrastado no Inspector, tenta pegar no mesmo objeto
+            if (audioSource == null) audioSource = GetComponent<AudioSource>();
 
             _poolRoot = new GameObject("Tiros").transform;
             for (int i = 0; i < poolSize; i++) _pool.Push(CreateTracer());
@@ -146,6 +159,12 @@ namespace RemoteChase.Combat
             }
 
             ShowTracer(muzzle, impact);
+
+            // TOCA O EFEITO SONORO DO TIRO
+            if (audioSource != null && shootSound != null)
+            {
+                audioSource.PlayOneShot(shootSound);
+            }
         }
 
         /// <summary>

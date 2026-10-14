@@ -3,13 +3,16 @@ using UnityEngine;
 
 namespace RemoteChase.Combat
 {
-    /// <summary>Os dois coletaveis de pista descritos no GDR.</summary>
+    /// <summary>Coletaveis de pista. Os tipos Reparo e Energia vem do PowerUp do Rafael.</summary>
     public enum PickupKind
     {
         /// <summary>Celula de Reparo Nanotecnologico: devolve integridade.</summary>
         Reparo,
 
-        /// <summary>Celula de Turbo / Energia: escudo defletor temporario.</summary>
+        /// <summary>Celula de Energia: recarrega a bateria do drone.</summary>
+        Energia,
+
+        /// <summary>Celula de Turbo: escudo defletor temporario.</summary>
         Escudo
     }
 
@@ -29,6 +32,9 @@ namespace RemoteChase.Combat
         [Tooltip("Integridade devolvida pela celula de reparo.")]
         public float healAmount = 25f;
 
+        [Tooltip("Bateria recarregada pela celula de energia.")]
+        public float energyAmount = 30f;
+
         [Tooltip("Segundos de escudo defletor da celula de turbo.")]
         public float shieldDuration = 5f;
 
@@ -46,6 +52,9 @@ namespace RemoteChase.Combat
 
         /// <summary>Alvo que pode coletar.</summary>
         public PlayerHealth Player { get; set; }
+
+        /// <summary>Bateria do alvo, usada pela celula de energia.</summary>
+        public DroneEnergy Energy { get; set; }
 
         Vector3 _anchor;
         float _phase;
@@ -91,17 +100,24 @@ namespace RemoteChase.Combat
         /// <summary>Aplica o efeito. Devolve falso se o item nao serve agora.</summary>
         bool Collect()
         {
-            if (kind == PickupKind.Escudo)
+            switch (kind)
             {
-                Player.GrantInvulnerability(shieldDuration);
-                return true;
+                case PickupKind.Escudo:
+                    Player.GrantInvulnerability(shieldDuration);
+                    return true;
+
+                case PickupKind.Energia:
+                    if (Energy == null || Energy.Normalized >= 1f) return false;
+                    Energy.Recharge(energyAmount);
+                    return true;
+
+                default:
+                    // Integridade cheia: o reparo fica para tras em vez de
+                    // ser desperdicado.
+                    if (Player.Normalized >= 1f) return false;
+                    Player.Heal(healAmount);
+                    return true;
             }
-
-            // Integridade cheia: o reparo fica para tras em vez de ser desperdicado.
-            if (Player.Normalized >= 1f) return false;
-
-            Player.Heal(healAmount);
-            return true;
         }
     }
 }

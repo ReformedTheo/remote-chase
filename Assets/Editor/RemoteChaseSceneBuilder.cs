@@ -65,9 +65,28 @@ namespace RemoteChase.EditorTools
             Debug.Log($"[Remote Chase] Cena criada em {ScenePath}. Aperte Play para pilotar.");
         }
 
-        [MenuItem("Tools/Remote Chase/Criar cena Corrida (rail)")]
+        /// <summary>
+        /// ATENCAO: recria a cena do zero e JOGA FORA tudo que foi montado a mao
+        /// nela -- Canvas, HUD, menu de pausa, posicionamento ajustado no editor.
+        ///
+        /// Fazia sentido quando a cena era 100% gerada. Desde que a UI passou a
+        /// ser montada no editor, isto virou ferramenta de ultimo caso: serve para
+        /// recomecar do zero, nao para atualizar a cena existente.
+        /// </summary>
+        [MenuItem("Tools/Remote Chase/PERIGO - Recriar cena Corrida do zero")]
         public static void CreateRailScene()
         {
+            if (!Application.isBatchMode
+                && !EditorUtility.DisplayDialog(
+                        "Recriar a cena do zero?",
+                        "Isto apaga TUDO que foi montado a mao na Corrida.unity: "
+                      + "Canvas, HUD, menu de pausa e qualquer ajuste feito no editor.\n\n"
+                      + "So continue se a intencao for mesmo recomecar.",
+                        "Apagar e recriar", "Cancelar"))
+            {
+                return;
+            }
+
             // Em batchmode nao existe ninguem para responder dialogo: o build pela
             // linha de comando chama este mesmo metodo e travaria aqui.
             if (!Application.isBatchMode)
@@ -168,7 +187,9 @@ namespace RemoteChase.EditorTools
             droneVisual.pitchSource = DroneVisual.PitchSource.ClimbRate;
 
             drone.AddComponent<PlayerHealth>();
+            drone.AddComponent<DroneEnergy>();
             drone.AddComponent<DroneAim>();
+            drone.AddComponent<AudioSource>();
 
             var weapon = drone.AddComponent<DroneWeapon>();
             weapon.tracerMaterial = GetOrCreateMaterial(

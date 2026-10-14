@@ -66,9 +66,6 @@ namespace RemoteChase.World
         [Tooltip("Tamanho do item coletavel.")]
         public float pickupSize = 1.8f;
 
-        [Tooltip("Dos itens que nascem, quantos sao celula de escudo em vez de reparo.")]
-        [Range(0f, 1f)] public float shieldShare = 0.35f;
-
         [Header("Arte (opcional)")]
         [Tooltip("Prefab do predio. Vazio = cubo primitivo. O prefab precisa ter "
                + "tamanho base 1x1x1, porque o gerador dimensiona por localScale.")]
@@ -80,6 +77,9 @@ namespace RemoteChase.World
         [Tooltip("Prefab do item de escudo. Vazio = capsula primitiva.")]
         public GameObject shieldPrefab;
 
+        [Tooltip("Prefab da celula de energia. Vazio = capsula primitiva.")]
+        public GameObject energyPrefab;
+
         [Header("Visual")]
         public Material groundMaterial;
         public Material[] buildingMaterials;
@@ -88,8 +88,12 @@ namespace RemoteChase.World
         [Tooltip("Material da celula de escudo.")]
         public Material shieldMaterial;
 
+        [Tooltip("Material da celula de energia.")]
+        public Material energyMaterial;
+
         Game.GameSession _session;
         Combat.PlayerHealth _playerHealth;
+        Combat.DroneEnergy _playerEnergy;
 
         [Tooltip("Semente do sorteio: a mesma semente gera sempre a mesma fase.")]
         public int seed = 1337;
@@ -119,6 +123,7 @@ namespace RemoteChase.World
 
             _session = FindAnyObjectByType<Game.GameSession>();
             _playerHealth = FindAnyObjectByType<Combat.PlayerHealth>();
+            _playerEnergy = FindAnyObjectByType<Combat.DroneEnergy>();
 
             for (int i = 0; i < segmentsAhead + segmentsBehind + 1; i++)
             {
@@ -176,12 +181,25 @@ namespace RemoteChase.World
         {
             // Os tipos sao distribuidos na criacao e nao mudam depois: assim cada
             // item mantem o prefab e o material do seu tipo ao ser reciclado.
-            bool isShield = index % 3 == 0 && shieldShare > 0f;
-            GameObject prefab = isShield ? shieldPrefab : repairPrefab;
-            Material material = isShield ? shieldMaterial : pickupMaterial;
+            // Reparo e Energia vem do PowerUp do Rafael; Escudo e o terceiro.
+            Combat.PickupKind kind = (Combat.PickupKind)(index % 3);
 
-            GameObject body = CreateVisual(parent, isShield ? $"Escudo_{index}" : $"Reparo_{index}",
-                                           prefab, PrimitiveType.Capsule, material);
+            GameObject prefab = kind switch
+            {
+                Combat.PickupKind.Energia => energyPrefab,
+                Combat.PickupKind.Escudo => shieldPrefab,
+                _ => repairPrefab
+            };
+
+            Material material = kind switch
+            {
+                Combat.PickupKind.Energia => energyMaterial,
+                Combat.PickupKind.Escudo => shieldMaterial,
+                _ => pickupMaterial
+            };
+
+            GameObject body = CreateVisual(parent, $"{kind}_{index}", prefab,
+                                           PrimitiveType.Capsule, material);
             body.transform.localScale = Vector3.one * pickupSize;
 
             // Sem collider: se tivesse, encostar no item dispararia o
@@ -192,8 +210,9 @@ namespace RemoteChase.World
             }
 
             var pickup = body.AddComponent<Combat.Pickup>();
-            pickup.kind = isShield ? Combat.PickupKind.Escudo : Combat.PickupKind.Reparo;
+            pickup.kind = kind;
             pickup.Player = _playerHealth;
+            pickup.Energy = _playerEnergy;
             pickup.OnCollected += HandlePickupCollected;
             body.SetActive(false);
             return pickup;

@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/Menu.unity
+    guid: 9fd5e354a6356d3b889087ebad89a9b2
+  - enabled: 1
     path: Assets/Scenes/Corrida.unity
     guid: 0a7fc182b704e77499bd3220ccb1e930
   - enabled: 1

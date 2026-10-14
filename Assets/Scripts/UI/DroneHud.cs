@@ -87,6 +87,10 @@ namespace RemoteChase.UI
             if (_motion == null) return;
             if (_session != null && _session.IsOver) return;
 
+            // Com o jogo pausado o OnGUI continua rodando, entao sem isto o
+            // retículo ficaria desenhado por cima do menu de pausa.
+            if (Time.timeScale == 0f) return;
+
             EnsureStyle();
             DrawReticle();
             DrawStatus();
@@ -110,9 +114,12 @@ namespace RemoteChase.UI
 
         void DrawStatus()
         {
-            if (_health != null) DrawHealthBar();
+            // A barra de vida agora e a do Rafael, em Canvas, com os sprites.
+            // Esta aqui so aparece se o HUD dele nao estiver na cena.
+            bool hasCanvasHud = FindAnyObjectByType<PlayerHUDController>() != null;
+            if (_health != null && !hasCanvasHud) DrawHealthBar();
 
-            GUILayout.BeginArea(new Rect(16f, _health != null ? 52f : 16f, 320f, 240f));
+            GUILayout.BeginArea(new Rect(16f, 200f, 320f, 240f));
 
             if (_session != null)
             {

@@ -1,9 +1,20 @@
 using UnityEngine;
 using UnityEngine.UI;
-using RemoteChase.Drone;
+using RemoteChase.Combat;
 
 namespace RemoteChase.UI
 {
+    /// <summary>
+    /// HUD de vida e bateria com as imagens de preenchimento (Rafael Moura).
+    ///
+    /// Integracao: na versao original este script era dono da vida -- tinha
+    /// currentHealth, assinava OnCrash e aplicava dano. No projeto principal quem
+    /// faz isso e o PlayerHealth, que a GameSession ja escuta para a tela de
+    /// derrota. Com os dois donos, cada batida tirava dano duas vezes.
+    ///
+    /// Entao aqui ele virou camada visual: le o PlayerHealth e o DroneEnergy e
+    /// so desenha. O layout, os sprites e a logica de fillAmount sao os dele.
+    /// </summary>
     [AddComponentMenu("Remote Chase/Player HUD Controller")]
     public class PlayerHUDController : MonoBehaviour
     {
@@ -11,119 +22,65 @@ namespace RemoteChase.UI
         [SerializeField] private Image vidaFillImage;
         [SerializeField] private Image energiaFillImage;
 
-        [Header("Atributos de Vida")]
-        [SerializeField] private float maxHealth = 100f;
-        private float currentHealth;
+        [Header("Fontes de dado")]
+        [Tooltip("Integridade do drone. Se vazio, procura na cena.")]
+        [SerializeField] private PlayerHealth health;
 
-        [Header("Atributos de Bateria / Energia")]
-        [SerializeField] private float maxEnergy = 100f;
-        private float currentEnergy;
-        [SerializeField] private float batteryDrainRate = 4f;
+        [Tooltip("Bateria do drone. Se vazio, procura na cena.")]
+        [SerializeField] private DroneEnergy energy;
 
-        [Header("Configuração de Dano por Batida")]
-        [Tooltip("Multiplicador aplicado à velocidade de impacto para definir o dano na vida.")]
-        [SerializeField] private float crashDamageMultiplier = 2.5f;
+        /// <summary>Vida atual, para quem ainda consultava o HUD.</summary>
+        public float CurrentHealth => health != null ? health.Current : 0f;
 
-        private IDroneMotion _droneMotion;
+        /// <summary>Vida maxima.</summary>
+        public float MaxHealth => health != null ? health.maxHealth : 0f;
 
-        public float CurrentHealth => currentHealth;
-        public float MaxHealth => maxHealth;
-        public float CurrentEnergy => currentEnergy;
-        public float MaxEnergy => maxEnergy;
+        /// <summary>Bateria atual.</summary>
+        public float CurrentEnergy => energy != null ? energy.Current : 0f;
+
+        /// <summary>Bateria maxima.</summary>
+        public float MaxEnergy => energy != null ? energy.maxEnergy : 0f;
 
         void Awake()
         {
-            currentHealth = maxHealth;
-            currentEnergy = maxEnergy;
-
-            // Procura o componente de movimento do drone no mesmo objeto ou na cena
-            _droneMotion = GetComponent<IDroneMotion>();
-            if (_droneMotion == null) _droneMotion = FindAnyObjectByType<DroneController>();
-            if (_droneMotion == null) _droneMotion = FindAnyObjectByType<DroneRailController>();
-        }
-
-        void OnEnable()
-        {
-            // Subscreve ao evento de batida existente na arquitetura do drone
-            if (_droneMotion != null)
-            {
-                _droneMotion.OnCrash += HandleCrash;
-            }
-        }
-
-        void OnDisable()
-        {
-            // Remove a subscrição para evitar erros de memória
-            if (_droneMotion != null)
-            {
-                _droneMotion.OnCrash -= HandleCrash;
-            }
+            if (health == null) health = FindAnyObjectByType<PlayerHealth>();
+            if (energy == null) energy = FindAnyObjectByType<DroneEnergy>();
         }
 
         void Update()
         {
-            if (currentEnergy > 0f)
-            {
-                currentEnergy -= batteryDrainRate * Time.deltaTime;
-                currentEnergy = Mathf.Max(currentEnergy, 0f);
-            }
-
             UpdateVisuals();
         }
 
         void UpdateVisuals()
         {
-            if (vidaFillImage != null)
+            if (vidaFillImage != null && health != null)
             {
-                vidaFillImage.fillAmount = currentHealth / maxHealth;
+                vidaFillImage.fillAmount = health.Normalized;
             }
 
-            if (energiaFillImage != null)
+            if (energiaFillImage != null && energy != null)
             {
-                energiaFillImage.fillAmount = currentEnergy / maxEnergy;
+                energiaFillImage.fillAmount = energy.Normalized;
             }
         }
 
-        /// <summary>
-        /// Acionado automaticamente sempre que o drone sofre uma batida física ou no trilho.
-        /// </summary>
-        void HandleCrash(float impactSpeed)
-        {
-            float damage = impactSpeed * crashDamageMultiplier;
-            TakeDamage(damage);
-            Debug.Log($"Batida detetada! Velocidade: {impactSpeed:0.0} m/s | Dano aplicado: {damage:0.0}");
-        }
-
+        /// <summary>Repassa dano para o PlayerHealth. Mantido para quem ja chamava.</summary>
         public void TakeDamage(float amount)
         {
-            if (amount <= 0f) return;
-
-            currentHealth -= amount;
-            currentHealth = Mathf.Max(currentHealth, 0f);
-
-            if (currentHealth <= 0f)
-            {
-                HandlePlayerDeath();
-            }
+            if (health != null) health.TakeHit(amount, transform.position);
         }
 
-        public void AddEnergy(float amount)
-        {
-            if (amount <= 0f) return;
-            currentEnergy += amount;
-            currentEnergy = Mathf.Min(currentEnergy, maxEnergy);
-        }
-
+        /// <summary>Repassa cura para o PlayerHealth.</summary>
         public void Heal(float amount)
         {
-            if (amount <= 0f) return;
-            currentHealth += amount;
-            currentHealth = Mathf.Min(currentHealth, maxHealth);
+            if (health != null) health.Heal(amount);
         }
 
-        void HandlePlayerDeath()
+        /// <summary>Repassa recarga para o DroneEnergy.</summary>
+        public void AddEnergy(float amount)
         {
-            Debug.Log("O drone foi destruído! Game Over.");
+            if (energy != null) energy.Recharge(amount);
         }
     }
 }
