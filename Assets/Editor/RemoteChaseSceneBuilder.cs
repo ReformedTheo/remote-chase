@@ -144,6 +144,8 @@ namespace RemoteChase.EditorTools
             spawner.drone = drone.GetComponent<DroneRailController>();
             spawner.enemyMaterial = GetOrCreateMaterial(
                 "Inimigo", new Color(0.95f, 0.25f, 0.1f), 0.6f);
+            spawner.swarmMaterial = GetOrCreateMaterial(
+                "Enxame", new Color(1f, 0.6f, 0.05f), 0.5f);
 
             CreateRailCamera(drone.transform);
 

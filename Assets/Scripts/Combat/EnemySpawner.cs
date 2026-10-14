@@ -54,6 +54,29 @@ namespace RemoteChase.Combat
         [Tooltip("Amplitude do sobe e desce no fim da fase.")]
         public float bobAtEnd = 3f;
 
+        [Header("Drone Enxame (kamikaze)")]
+        [Tooltip("A partir de que ponto da fase o Enxame comeca a aparecer, de 0 a 1. "
+               + "Deixa a primeira parte so com alvos parados, para aprender a mira.")]
+        [Range(0f, 1f)] public float swarmStartsAt = 0.25f;
+
+        [Tooltip("Quantos Enxames no maximo ao mesmo tempo.")]
+        public int maxSwarmAlive = 3;
+
+        [Tooltip("Segundos entre dois Enxames no fim da fase. No comeco e o dobro.")]
+        public float swarmInterval = 4f;
+
+        [Tooltip("A que distancia a frente do drone o Enxame surge.")]
+        public float swarmSpawnDistance = 150f;
+
+        [Tooltip("Diametro do Enxame. Menor que o Sentinela: alvo mais dificil.")]
+        public float swarmSize = 1.8f;
+
+        [Tooltip("Material do Enxame.")]
+        public Material swarmMaterial;
+
+        [Tooltip("Prefab do Enxame. Vazio = capsula primitiva.")]
+        public GameObject swarmPrefab;
+
         [Header("Visual")]
         [Tooltip("Diametro do inimigo.")]
         public float enemySize = 2.6f;
@@ -71,9 +94,14 @@ namespace RemoteChase.Combat
 
         Game.GameSession _session;
         EnemyBulletPool _bulletPool;
+        PlayerHealth _playerHealth;
         readonly Stack<Enemy> _pool = new Stack<Enemy>();
         readonly List<Enemy> _alive = new List<Enemy>();
+        readonly Stack<SwarmDrone> _swarmPool = new Stack<SwarmDrone>();
+        readonly List<SwarmDrone> _swarmAlive = new List<SwarmDrone>();
+        Transform _swarmRoot;
         float _spawnTimer;
+        float _swarmTimer;
         float _railZ;
 
         void Start()
@@ -82,11 +110,20 @@ namespace RemoteChase.Combat
 
             _session = FindAnyObjectByType<Game.GameSession>();
             _bulletPool = FindAnyObjectByType<EnemyBulletPool>();
+            _playerHealth = FindAnyObjectByType<PlayerHealth>();
 
             // Pool com folga: alguns alvos ainda estao encolhendo ao morrer
             // enquanto outros ja nasceram.
             int poolSize = Mathf.Max(maxAlive * 3, 6);
             for (int i = 0; i < poolSize; i++) _pool.Push(Create(i));
+
+            // Container proprio, parado na origem: o Enxame se move em espaco de
+            // mundo. Se fosse filho deste objeto, que acompanha o drone, o
+            // movimento do referencial somaria ao mergulho dele.
+            _swarmRoot = new GameObject("Enxame").transform;
+
+            int swarmPoolSize = Mathf.Max(maxSwarmAlive * 2, 4);
+            for (int i = 0; i < swarmPoolSize; i++) _swarmPool.Push(CreateSwarm(i));
         }
 
         void Update()
@@ -94,6 +131,9 @@ namespace RemoteChase.Combat
             FollowDrone();
             RecycleFinished();
             TrySpawn();
+
+            RecycleSwarm();
+            TrySpawnSwarm();
         }
 
         /// <summary>
@@ -176,6 +216,81 @@ namespace RemoteChase.Combat
         }
 
         void HandleKilled(Enemy enemy, Vector3 point)
+        {
+            Kills++;
+            if (_session != null) _session.RegisterKill();
+        }
+
+        void RecycleSwarm()
+        {
+            for (int i = _swarmAlive.Count - 1; i >= 0; i--)
+            {
+                SwarmDrone swarm = _swarmAlive[i];
+                if (swarm != null && swarm.gameObject.activeSelf) continue;
+
+                _swarmAlive.RemoveAt(i);
+                if (swarm != null) _swarmPool.Push(swarm);
+            }
+        }
+
+        void TrySpawnSwarm()
+        {
+            if (drone == null || _swarmAlive.Count >= maxSwarmAlive) return;
+
+            // So entra depois que o jogador teve tempo de aprender a mira nos
+            // alvos parados.
+            float progress = drone.SpeedProgress;
+            if (progress < swarmStartsAt) return;
+
+            _swarmTimer -= Time.deltaTime;
+            if (_swarmTimer > 0f) return;
+
+            // Comeca raro e vai apertando ate o intervalo cheio no fim da fase.
+            float ramp = Mathf.InverseLerp(swarmStartsAt, 1f, progress);
+            _swarmTimer = Mathf.Lerp(swarmInterval * 2f, swarmInterval, ramp);
+
+            SwarmDrone swarm = _swarmPool.Count > 0 ? _swarmPool.Pop() : CreateSwarm(_swarmAlive.Count);
+
+            // Nasce fora da area de manobra, para vir de fora da tela e obrigar
+            // a virar a mira em vez de ja aparecer debaixo do retículo.
+            float side = Random.value < 0.5f ? -1f : 1f;
+            var world = new Vector3(
+                areaCenter.x + side * (areaHalfExtents.x + Random.Range(2f, 9f)),
+                areaCenter.y + Random.Range(-areaHalfExtents.y, areaHalfExtents.y),
+                drone.transform.position.z + swarmSpawnDistance);
+
+            swarm.Spawn(world, Random.Range(0f, 6.28f));
+            _swarmAlive.Add(swarm);
+        }
+
+        SwarmDrone CreateSwarm(int index)
+        {
+            GameObject body = swarmPrefab != null
+                ? Instantiate(swarmPrefab, _swarmRoot)
+                : GameObject.CreatePrimitive(PrimitiveType.Capsule);
+
+            body.name = $"Enxame_{index}";
+            if (swarmPrefab == null)
+            {
+                body.transform.SetParent(_swarmRoot, false);
+                if (swarmMaterial != null)
+                {
+                    body.GetComponent<MeshRenderer>().sharedMaterial = swarmMaterial;
+                }
+            }
+
+            body.transform.localScale = Vector3.one * swarmSize;
+
+            var swarm = body.AddComponent<SwarmDrone>();
+            swarm.Target = drone;
+            swarm.TargetHealth = _playerHealth;
+            swarm.OnKilled += HandleSwarmKilled;
+
+            body.SetActive(false);
+            return swarm;
+        }
+
+        void HandleSwarmKilled(SwarmDrone swarm, Vector3 point)
         {
             Kills++;
             if (_session != null) _session.RegisterKill();
