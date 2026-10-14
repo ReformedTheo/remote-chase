@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using RemoteChase.Combat;
+using RemoteChase.Drone;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -44,6 +45,7 @@ namespace RemoteChase.EditorTools
                 ? mixer.FindMatchingGroups("SFX").FirstOrDefault()
                 : null;
 
+            EnsureGameplayComponents(report);
             WirePauseMenu(report, mixer);
             WireWeaponAudio(report, sfxGroup);
 
@@ -79,6 +81,60 @@ namespace RemoteChase.EditorTools
 
             EditorBuildSettings.scenes = scenes.ToArray();
             Debug.Log($"[Religar] Build Settings: {string.Join(", ", scenes.Select(s => s.path))}");
+        }
+
+        /// <summary>
+        /// Acrescenta na cena os componentes de jogo que foram criados depois que
+        /// ela deixou de ser gerada por codigo. So adiciona o que falta, entao
+        /// pode rodar de novo a cada sistema novo sem estragar o que ja existe.
+        /// </summary>
+        static void EnsureGameplayComponents(List<string> report)
+        {
+            GameObject host = scenes_FindRoot("Regras da fase");
+            if (host == null)
+            {
+                host = new GameObject("Regras da fase");
+                report.Add("Objeto 'Regras da fase' criado.");
+            }
+
+            if (host.GetComponent<Game.GameSession>() == null)
+            {
+                host.AddComponent<Game.GameSession>();
+                report.Add("GameSession adicionado.");
+            }
+
+            if (host.GetComponent<Game.DebugCheats>() == null)
+            {
+                host.AddComponent<Game.DebugCheats>();
+                report.Add("DebugCheats adicionado (F1/F2/F3).");
+            }
+
+            var director = host.GetComponent<Game.PhaseDirector>();
+            if (director == null || director.phases == null || director.phases.Length == 0)
+            {
+                if (director != null) Object.DestroyImmediate(director);
+                RemoteChaseSceneBuilder.CreatePhases(host);
+                report.Add("PhaseDirector configurado com as 2 fases.");
+            }
+
+            // O drone ganhou componentes depois da uniao das cenas.
+            var drone = Object.FindAnyObjectByType<DroneRailController>(FindObjectsInactive.Include);
+            if (drone != null)
+            {
+                if (drone.GetComponent<DroneEnergy>() == null)
+                {
+                    drone.gameObject.AddComponent<DroneEnergy>();
+                    report.Add("DroneEnergy adicionado ao drone.");
+                }
+
+                if (drone.GetComponent<AudioSource>() == null)
+                {
+                    drone.gameObject.AddComponent<AudioSource>();
+                    report.Add("AudioSource adicionado ao drone.");
+                }
+            }
+
+            EditorUtility.SetDirty(host);
         }
 
         static void WirePauseMenu(List<string> report, AudioMixer mixer)

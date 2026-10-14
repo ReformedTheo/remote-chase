@@ -34,11 +34,21 @@ namespace RemoteChase.Game
         /// <summary>Pontuacao atual.</summary>
         public int Score => _bonusScore + Mathf.FloorToInt(Distance * scorePerMeter);
 
-        /// <summary>Distancia percorrida na fase.</summary>
-        public float Distance => _drone != null ? _drone.Distance : 0f;
+        /// <summary>Distancia percorrida na fase atual.</summary>
+        public float Distance => _drone != null ? _drone.PhaseDistance : 0f;
 
-        /// <summary>Progresso do percurso, de 0 a 1.</summary>
-        public float Progress => targetDistance > 0f ? Mathf.Clamp01(Distance / targetDistance) : 0f;
+        /// <summary>Meta da fase atual, em metros.</summary>
+        public float PhaseTarget =>
+            _director != null && _director.Current != null
+                ? _director.Current.targetDistance
+                : targetDistance;
+
+        /// <summary>Progresso do percurso da fase, de 0 a 1.</summary>
+        public float Progress => PhaseTarget > 0f ? Mathf.Clamp01(Distance / PhaseTarget) : 0f;
+
+        /// <summary>Nome da fase atual, para o HUD.</summary>
+        public string PhaseName =>
+            _director != null && _director.Current != null ? _director.Current.displayName : "";
 
         /// <summary>Inimigos abatidos.</summary>
         public int Kills { get; private set; }
@@ -55,6 +65,7 @@ namespace RemoteChase.Game
         DroneRailController _drone;
         PlayerHealth _health;
         DroneEnergy _energy;
+        PhaseDirector _director;
         int _bonusScore;
         string _defeatReason = "Blindagem destruida";
         GUIStyle _title;
@@ -65,6 +76,7 @@ namespace RemoteChase.Game
             _drone = FindAnyObjectByType<DroneRailController>();
             _health = FindAnyObjectByType<PlayerHealth>();
             _energy = FindAnyObjectByType<DroneEnergy>();
+            _director = FindAnyObjectByType<PhaseDirector>();
 
             // Time.timeScale e global e sobrevive a troca de cena: se a partida
             // anterior terminou com o jogo pausado, e aqui que ele volta a andar.
@@ -91,7 +103,12 @@ namespace RemoteChase.Game
                 return;
             }
 
-            if (Distance >= targetDistance) Finish(true);
+            if (Distance < PhaseTarget) return;
+
+            // Chegou ao fim da fase: se houver proxima, troca; se nao, venceu.
+            if (_director != null && _director.Advance()) return;
+
+            Finish(true);
         }
 
         /// <summary>Registra um abate. Chamado pelo gerador do corredor.</summary>

@@ -123,9 +123,14 @@ namespace RemoteChase.UI
 
             if (_session != null)
             {
+                if (!string.IsNullOrEmpty(_session.PhaseName))
+                {
+                    GUILayout.Label(_session.PhaseName, _style);
+                }
+
                 GUILayout.Label($"Pontos: {_session.Score}", _style);
                 GUILayout.Label($"Percurso: {_session.Progress * 100f:0}%"
-                              + $"  ({_session.Distance:0} / {_session.targetDistance:0} m)", _style);
+                              + $"  ({_session.Distance:0} / {_session.PhaseTarget:0} m)", _style);
                 GUILayout.Label($"Abatidos: {_session.Kills}", _style);
             }
 

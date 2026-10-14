@@ -121,6 +121,8 @@ namespace RemoteChase.EditorTools
             // para registrar abates e coletas.
             var sessionRoot = new GameObject("Regras da fase");
             sessionRoot.AddComponent<GameSession>();
+            sessionRoot.AddComponent<DebugCheats>();
+            CreatePhases(sessionRoot);
 
             var bulletPoolRoot = new GameObject("Tiros inimigos");
             var bulletPool = bulletPoolRoot.AddComponent<EnemyBulletPool>();
@@ -155,6 +157,81 @@ namespace RemoteChase.EditorTools
 
             AssetDatabase.SaveAssets();
             Debug.Log($"[Remote Chase] Cena do trilho criada em {RailScenePath}. Aperte Play.");
+        }
+
+        /// <summary>
+        /// As duas fases do GDR. Fase 1 e avenida aberta e larga, para aprender;
+        /// Fase 2 e tunel industrial fechado por teto, mais estreito e mais rapido.
+        /// </summary>
+        public static void CreatePhases(GameObject host)
+        {
+            Material surfaceGround = GetOrCreateMaterial("Chao", new Color(0.16f, 0.17f, 0.20f), 0.9f);
+            Material[] surfaceBuildings =
+            {
+                GetOrCreateMaterial("PredioA", new Color(0.36f, 0.39f, 0.45f), 0.65f),
+                GetOrCreateMaterial("PredioB", new Color(0.28f, 0.31f, 0.36f), 0.6f),
+                GetOrCreateMaterial("PredioC", new Color(0.45f, 0.42f, 0.38f), 0.7f)
+            };
+
+            Material industrialGround = GetOrCreateMaterial(
+                "ChaoIndustrial", new Color(0.1f, 0.1f, 0.12f), 0.4f);
+            Material[] industrialWalls =
+            {
+                GetOrCreateMaterial("DutoA", new Color(0.22f, 0.2f, 0.19f), 0.35f),
+                GetOrCreateMaterial("DutoB", new Color(0.3f, 0.26f, 0.2f), 0.45f),
+                GetOrCreateMaterial("DutoC", new Color(0.16f, 0.18f, 0.2f), 0.3f)
+            };
+
+            var director = host.AddComponent<PhaseDirector>();
+            director.phases = new[]
+            {
+                new PhaseDefinition
+                {
+                    displayName = "FASE 1 - CORREDOR CORPORATIVO",
+                    subtitle = "Avenidas aereas da superficie",
+                    targetDistance = 2200f,
+                    startSpeed = 26f,
+                    maxSpeed = 90f,
+                    rampDistance = 1700f,
+                    corridorHalfWidth = 18f,
+                    ceilingHeight = 0f,
+                    buildingHeightRange = new Vector2(30f, 110f),
+                    obstacleChance = 0.25f,
+                    maxEnemies = 4,
+                    enemyInterval = 1.2f,
+                    swarmStartsAt = 0.3f,
+                    fogColor = new Color(0.55f, 0.6f, 0.68f),
+                    fogDensity = 0.0035f,
+                    ambientColor = new Color(0.45f, 0.52f, 0.62f),
+                    groundMaterial = surfaceGround,
+                    buildingMaterials = surfaceBuildings,
+                    seed = 1337
+                },
+                new PhaseDefinition
+                {
+                    displayName = "FASE 2 - NUCLEO INDUSTRIAL",
+                    subtitle = "Velocidade extrema em espaco fechado",
+                    targetDistance = 1800f,
+                    // Comeca onde a Fase 1 terminou, em vez de voltar ao ritmo
+                    // inicial: a sensacao e de continuidade, nao de recomeco.
+                    startSpeed = 85f,
+                    maxSpeed = 130f,
+                    rampDistance = 1200f,
+                    corridorHalfWidth = 11f,
+                    ceilingHeight = 26f,
+                    buildingHeightRange = new Vector2(18f, 30f),
+                    obstacleChance = 0.45f,
+                    maxEnemies = 5,
+                    enemyInterval = 0.9f,
+                    swarmStartsAt = 0f,
+                    fogColor = new Color(0.16f, 0.12f, 0.1f),
+                    fogDensity = 0.012f,
+                    ambientColor = new Color(0.3f, 0.22f, 0.18f),
+                    groundMaterial = industrialGround,
+                    buildingMaterials = industrialWalls,
+                    seed = 90210
+                }
+            };
         }
 
         static GameObject CreateRailDrone(Material material)

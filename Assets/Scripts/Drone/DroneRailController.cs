@@ -89,8 +89,35 @@ namespace RemoteChase.Drone
         /// <summary>Velocidade de avanco atual em m/s.</summary>
         public float ForwardSpeed { get; private set; }
 
-        /// <summary>Progresso da rampa de velocidade, de 0 a 1.</summary>
-        public float SpeedProgress => rampDistance > 0f ? Mathf.Clamp01(Distance / rampDistance) : 1f;
+        /// <summary>
+        /// Distancia percorrida na fase atual. Diferente de <see cref="Distance"/>,
+        /// que conta desde o inicio da partida e nunca volta -- se zerasse na troca
+        /// de fase, o drone seria teleportado para tras no trilho.
+        /// </summary>
+        public float PhaseDistance => Distance - _phaseStartDistance;
+
+        /// <summary>Progresso da rampa de velocidade da fase atual, de 0 a 1.</summary>
+        public float SpeedProgress => rampDistance > 0f
+            ? Mathf.Clamp01(PhaseDistance / rampDistance)
+            : 1f;
+
+        /// <summary>
+        /// Trava a velocidade na inicial, ignorando a rampa. Usado pelo cheat F3,
+        /// para a banca inspecionar o cenario sem a aceleracao atrapalhar.
+        /// </summary>
+        public bool SpeedLocked { get; set; }
+
+        /// <summary>
+        /// Comeca uma fase nova com outra curva de velocidade, sem mexer na
+        /// posicao: o drone continua de onde estava, so o ritmo muda.
+        /// </summary>
+        public void BeginPhase(float newStartSpeed, float newMaxSpeed, float newRampDistance)
+        {
+            startSpeed = newStartSpeed;
+            maxSpeed = newMaxSpeed;
+            rampDistance = newRampDistance;
+            _phaseStartDistance = Distance;
+        }
 
         /// <summary>Centro do trilho no plano X/Y -- o ponto neutro da manobra.</summary>
         public Vector2 RailCenter => new Vector2(_railX, railHeight);
@@ -130,6 +157,7 @@ namespace RemoteChase.Drone
         float _startZ;
         float _crashTimer;
         float _dashTimer;
+        float _phaseStartDistance;
         Combat.PlayerHealth _health;
 
         void Awake()
@@ -191,7 +219,9 @@ namespace RemoteChase.Drone
 
         void AdvanceRail(float dt)
         {
-            float target = Mathf.Lerp(startSpeed, maxSpeed, rampCurve.Evaluate(SpeedProgress));
+            float target = SpeedLocked
+                ? startSpeed
+                : Mathf.Lerp(startSpeed, maxSpeed, rampCurve.Evaluate(SpeedProgress));
             ForwardSpeed = Mathf.MoveTowards(ForwardSpeed, target, speedRecovery * dt);
             Distance += ForwardSpeed * dt;
         }

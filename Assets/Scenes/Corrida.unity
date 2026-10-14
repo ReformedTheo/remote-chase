@@ -153,6 +153,7 @@ MonoBehaviour:
   segmentsAhead: 14
   segmentsBehind: 2
   corridorHalfWidth: 18
+  ceilingHeight: 0
   buildingsPerSide: 3
   widthRange: {x: 10, y: 22}
   heightRange: {x: 30, y: 110}
@@ -1568,6 +1569,8 @@ GameObject:
   m_Component:
   - component: {fileID: 631757096}
   - component: {fileID: 631757095}
+  - component: {fileID: 631757098}
+  - component: {fileID: 631757097}
   m_Layer: 0
   m_Name: Regras da fase
   m_TagString: Untagged
@@ -1606,6 +1609,77 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &631757097
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 631757094}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: abcbfd2666188a74b8127931f7321731, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RemoteChase::RemoteChase.Game.PhaseDirector
+  phases:
+  - displayName: FASE 1 - CORREDOR CORPORATIVO
+    subtitle: Avenidas aereas da superficie
+    targetDistance: 2200
+    startSpeed: 26
+    maxSpeed: 90
+    rampDistance: 1700
+    corridorHalfWidth: 18
+    ceilingHeight: 0
+    buildingHeightRange: {x: 30, y: 110}
+    obstacleChance: 0.25
+    maxEnemies: 4
+    enemyInterval: 1.2
+    swarmStartsAt: 0.3
+    fogColor: {r: 0.55, g: 0.6, b: 0.68, a: 1}
+    fogDensity: 0.0035
+    ambientColor: {r: 0.45, g: 0.52, b: 0.62, a: 1}
+    groundMaterial: {fileID: 2100000, guid: 0a3bad47c7ffc3146bdd0a60667b6eff, type: 2}
+    buildingMaterials:
+    - {fileID: 2100000, guid: 32b3a1a7b8de1a24a828f4a3e32629af, type: 2}
+    - {fileID: 2100000, guid: d98a87c3ac405544ab01ded411cecb62, type: 2}
+    - {fileID: 2100000, guid: f6f06ca745312054eb79ddb172436b49, type: 2}
+    seed: 1337
+  - displayName: FASE 2 - NUCLEO INDUSTRIAL
+    subtitle: Velocidade extrema em espaco fechado
+    targetDistance: 1800
+    startSpeed: 85
+    maxSpeed: 130
+    rampDistance: 1200
+    corridorHalfWidth: 11
+    ceilingHeight: 26
+    buildingHeightRange: {x: 18, y: 30}
+    obstacleChance: 0.45
+    maxEnemies: 5
+    enemyInterval: 0.9
+    swarmStartsAt: 0
+    fogColor: {r: 0.16, g: 0.12, b: 0.1, a: 1}
+    fogDensity: 0.012
+    ambientColor: {r: 0.3, g: 0.22, b: 0.18, a: 1}
+    groundMaterial: {fileID: 2100000, guid: f687300b57bfdac4685ca7a3d04871b8, type: 2}
+    buildingMaterials:
+    - {fileID: 2100000, guid: 913dc24c263f6f440b3baa576cc1416f, type: 2}
+    - {fileID: 2100000, guid: b7fb23a66a65d4040803d22c4e99ff6e, type: 2}
+    - {fileID: 2100000, guid: dd892ff583d8cd546a7555d381554b55, type: 2}
+    seed: 90210
+  transitionDuration: 2.5
+--- !u!114 &631757098
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 631757094}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e59e423222933549b435d44f702a702, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RemoteChase::RemoteChase.Game.DebugCheats
+  showIndicator: 1
 --- !u!1 &638210173
 GameObject:
   m_ObjectHideFlags: 0
@@ -4867,6 +4941,13 @@ MonoBehaviour:
   strafeAtStart: 0
   strafeAtEnd: 7
   bobAtEnd: 3
+  swarmStartsAt: 0.25
+  maxSwarmAlive: 3
+  swarmInterval: 4
+  swarmSpawnDistance: 150
+  swarmSize: 1.8
+  swarmMaterial: {fileID: 0}
+  swarmPrefab: {fileID: 0}
   enemySize: 2.6
   enemyMaterial: {fileID: 2100000, guid: a75f7af26d42ae944801a1eed8b7fae7, type: 2}
   enemyPrefab: {fileID: 0}

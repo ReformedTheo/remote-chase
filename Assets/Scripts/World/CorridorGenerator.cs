@@ -28,6 +28,10 @@ namespace RemoteChase.World
         [Tooltip("Meia largura livre do corredor: os predios comecam depois disso.")]
         public float corridorHalfWidth = 18f;
 
+        [Tooltip("Altura do teto. 0 = ceu aberto (Fase 1). Acima de 0 fecha o "
+               + "corredor por cima e cria o tunel claustrofobico da Fase 2.")]
+        public float ceilingHeight;
+
         [Header("Predios")]
         [Tooltip("Quantos predios por lado em cada segmento.")]
         public int buildingsPerSide = 3;
@@ -107,6 +111,7 @@ namespace RemoteChase.World
         {
             public Transform Root;
             public Transform Ground;
+            public Transform Ceiling;
             public Transform[] Buildings;
             public Transform Obstacle;
             public Combat.Pickup[] Pickups;
@@ -150,6 +155,59 @@ namespace RemoteChase.World
             }
         }
 
+        /// <summary>
+        /// Reconstroi todos os segmentos com os parametros e materiais atuais.
+        /// E assim que a troca de fase muda o cenario sem recarregar a cena:
+        /// os objetos sao os mesmos, so mudam tamanho, cor e posicao.
+        ///
+        /// Os segmentos sao reposicionados a partir de onde o drone esta agora,
+        /// nao do inicio do mundo, senao a Fase 2 nasceria quilometros atras.
+        /// </summary>
+        public void Retheme(Material newGround, Material[] newBuildings, int newSeed)
+        {
+            if (newGround != null) groundMaterial = newGround;
+            if (newBuildings != null && newBuildings.Length > 0) buildingMaterials = newBuildings;
+            seed = newSeed;
+
+            ApplyMaterials();
+
+            int startIndex = follow != null
+                ? Mathf.FloorToInt(follow.position.z / segmentLength) - segmentsBehind
+                : 0;
+
+            _firstIndex = startIndex;
+            _nextIndex = startIndex;
+
+            foreach (Segment segment in _segments)
+            {
+                Place(segment, _nextIndex++);
+            }
+        }
+
+        /// <summary>Repinta os objetos ja criados com os materiais atuais.</summary>
+        void ApplyMaterials()
+        {
+            for (int s = 0; s < _segments.Count; s++)
+            {
+                Segment segment = _segments[s];
+
+                SetMaterial(segment.Ground, groundMaterial);
+                SetMaterial(segment.Ceiling, groundMaterial);
+                SetMaterial(segment.Obstacle, PickMaterial(0));
+
+                for (int i = 0; i < segment.Buildings.Length; i++)
+                {
+                    SetMaterial(segment.Buildings[i], PickMaterial(i));
+                }
+            }
+        }
+
+        static void SetMaterial(Transform target, Material material)
+        {
+            if (target == null || material == null) return;
+            if (target.TryGetComponent(out MeshRenderer renderer)) renderer.sharedMaterial = material;
+        }
+
         Segment CreateSegment(int poolIndex)
         {
             var root = new GameObject($"Segmento_{poolIndex}").transform;
@@ -159,6 +217,7 @@ namespace RemoteChase.World
             {
                 Root = root,
                 Ground = CreateBlock(root, "Chao", groundMaterial),
+                Ceiling = CreateBlock(root, "Teto", groundMaterial),
                 Buildings = new Transform[buildingsPerSide * 2],
                 Obstacle = CreateBlock(root, "Obstaculo", PickMaterial(0)),
                 Pickups = new Combat.Pickup[Mathf.Max(pickupsPerSegment, 0)]
@@ -272,6 +331,16 @@ namespace RemoteChase.World
 
             segment.Ground.localPosition = new Vector3(0f, -0.5f, segmentLength * 0.5f);
             segment.Ground.localScale = new Vector3(corridorHalfWidth * 4f, 1f, segmentLength);
+
+            bool roofed = ceilingHeight > 0f;
+            segment.Ceiling.gameObject.SetActive(roofed);
+            if (roofed)
+            {
+                segment.Ceiling.localPosition =
+                    new Vector3(0f, ceilingHeight + 0.5f, segmentLength * 0.5f);
+                segment.Ceiling.localScale =
+                    new Vector3(corridorHalfWidth * 4f, 1f, segmentLength);
+            }
 
             for (int i = 0; i < segment.Buildings.Length; i++)
             {
