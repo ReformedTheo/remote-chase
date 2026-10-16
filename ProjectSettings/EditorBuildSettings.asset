@@ -11,11 +11,5 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Corrida.unity
     guid: 0a7fc182b704e77499bd3220ccb1e930
-  - enabled: 1
-    path: Assets/Scenes/City.unity
-    guid: 4fc2747a93d602744a58fe6c106347b1
-  - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

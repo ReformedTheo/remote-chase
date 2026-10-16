@@ -1,10 +1,16 @@
 name: Build
 
-# Sem tags e sem PR obrigatorio: todo push na main roda o smoke test,
-# builda o .exe e publica o zip.
+# Roda so quando acionado a mao (aba Actions > Build > Run workflow).
+#
+# Era "todo push na main", mas a ativacao da licenca precisa dos secrets
+# UNITY_EMAIL e UNITY_PASSWORD, que nao estao cadastrados: o resultado era
+# um X vermelho em cada push, sem informacao nenhuma. Para voltar ao
+# automatico, cadastre os dois secrets e descomente o bloco push abaixo.
+#
+# on:
+#   push:
+#     branches: [main]
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 # Se chegarem dois pushes seguidos, o build antigo e cancelado.

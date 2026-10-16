@@ -65,6 +65,45 @@ namespace RemoteChase.EditorTools
             Fail($"Build falhou: {summary.result}, {summary.totalErrors} erro(s).");
         }
 
+        [MenuItem("Tools/Remote Chase/Build Linux")]
+        public static void BuildLinux()
+        {
+            string output = ReadArgument("-outputPath") ?? "Builds/Linux/RemoteChase.x86_64";
+
+            if (!File.Exists(ScenePath))
+            {
+                Fail($"A cena {ScenePath} nao existe. Abortando.");
+                return;
+            }
+
+            string directory = Path.GetDirectoryName(output);
+            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+
+            var options = new BuildPlayerOptions
+            {
+                scenes = EnabledScenes(),
+                locationPathName = output,
+                target = BuildTarget.StandaloneLinux64,
+                targetGroup = BuildTargetGroup.Standalone,
+                options = BuildOptions.None
+            };
+
+            Log($"Buildando Linux para {output}...");
+            BuildReport report = BuildPipeline.BuildPlayer(options);
+            BuildSummary summary = report.summary;
+
+            if (summary.result == BuildResult.Succeeded)
+            {
+                Log($"Build OK: {summary.totalSize / (1024 * 1024)} MB em "
+                  + $"{summary.totalTime.TotalSeconds:0} s -> {output}");
+                Exit(0);
+                return;
+            }
+
+            Fail($"Build falhou: {summary.result}, {summary.totalErrors} erro(s). "
+               + "Se o erro for de modulo ausente, falta o Linux Build Support.");
+        }
+
         [MenuItem("Tools/Remote Chase/Build WebGL")]
         public static void BuildWebGL()
         {
